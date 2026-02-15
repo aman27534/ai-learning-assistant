@@ -121,7 +121,7 @@ cd services/learning-svc
 node start.js
 ```
 
-Service runs on: http://localhost:3001
+Service runs on: http://localhost:3100
 
 ### Run Tests
 
@@ -183,3 +183,4 @@ While the core project is complete, potential future enhancements could include:
 - ✅ Developer-friendly setup and documentation
 
 **Status: COMPLETE AND OPERATIONAL** 🎉
+
