@@ -149,3 +149,10 @@ coverage/
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Local tools
+status.json
+current_status.txt
+pending_commits.txt
+*.log
+read_logs.js

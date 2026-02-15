@@ -95,6 +95,10 @@ async function checkAllServices() {
   } else {
     console.log('⚠️  Some services may need attention.');
   }
+
+  const fs = require('fs');
+  fs.writeFileSync('status.json', JSON.stringify(results, null, 2));
+  console.log('Status saved to status.json');
 }
 
 checkAllServices().catch(console.error);
