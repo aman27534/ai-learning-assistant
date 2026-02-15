@@ -1,0 +1,179 @@
+version: "3.8"
+
+# Development-specific overrides for docker-compose.yml
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+services:
+  # ============================================================================
+  # DEVELOPMENT OVERRIDES
+  # ============================================================================
+
+  api-gateway:
+    environment:
+      - NODE_ENV=development
+      - DEBUG=ai-learning:*
+      - LOG_LEVEL=debug
+    volumes:
+      - ./services/api-gateway:/app
+      - /app/node_modules
+    command: npm run dev
+
+  learning-service:
+    environment:
+      - NODE_ENV=development
+      - DEBUG=ai-learning:learning:*
+      - LOG_LEVEL=debug
+    volumes:
+      - ./services/learning-svc:/app
+      - /app/node_modules
+    command: npm run dev
+
+  productivity-service:
+    environment:
+      - NODE_ENV=development
+      - DEBUG=ai-learning:productivity:*
+      - LOG_LEVEL=debug
+    volumes:
+      - ./services/productivity-svc:/app
+      - /app/node_modules
+    command: npm run dev
+
+  knowledge-graph-service:
+    environment:
+      - NODE_ENV=development
+      - DEBUG=ai-learning:knowledge:*
+      - LOG_LEVEL=debug
+    volumes:
+      - ./services/knowledge-graph-svc:/app
+      - /app/node_modules
+    command: npm run dev
+
+  content-service:
+    environment:
+      - NODE_ENV=development
+      - DEBUG=ai-learning:content:*
+      - LOG_LEVEL=debug
+    volumes:
+      - ./services/content-svc:/app
+      - /app/node_modules
+    command: npm run dev
+
+  analytics-service:
+    environment:
+      - NODE_ENV=development
+      - DEBUG=ai-learning:analytics:*
+      - LOG_LEVEL=debug
+    volumes:
+      - ./services/analytics-svc:/app
+      - /app/node_modules
+    command: npm run dev
+
+  web-frontend:
+    environment:
+      - NODE_ENV=development
+      - REACT_APP_DEBUG=true
+    volumes:
+      - ./web:/app
+      - /app/node_modules
+    command: npm start
+
+  # ============================================================================
+  # DEVELOPMENT DATABASES WITH REDUCED RESOURCES
+  # ============================================================================
+
+  postgres:
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=ai_learning_assistant
+    command: postgres -c shared_preload_libraries=pg_stat_statements -c pg_stat_statements.track=all
+
+  neo4j:
+    environment:
+      - NEO4J_dbms_memory_heap_initial__size=256m
+      - NEO4J_dbms_memory_heap_max__size=512m
+      - NEO4J_dbms_memory_pagecache_size=256m
+
+  elasticsearch:
+    environment:
+      - "ES_JAVA_OPTS=-Xms256m -Xmx256m"
+      - cluster.routing.allocation.disk.threshold_enabled=false
+
+  # ============================================================================
+  # ADDITIONAL DEVELOPMENT TOOLS
+  # ============================================================================
+
+  # Hot reload proxy for frontend development
+  webpack-dev-server:
+    image: node:18-alpine
+    working_dir: /app
+    volumes:
+      - ./web:/app
+      - /app/node_modules
+    ports:
+      - "3101:3101"
+    command: npm run dev:hot
+    networks:
+      - ai-learning-network
+    depends_on:
+      - api-gateway
+
+  # Database seeding service
+  db-seed:
+    build:
+      context: ./scripts
+      dockerfile: Dockerfile.seed
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/ai_learning_assistant
+      - NEO4J_URI=bolt://neo4j:7687
+      - NEO4J_USER=neo4j
+      - NEO4J_PASSWORD=password
+    depends_on:
+      - postgres
+      - neo4j
+    networks:
+      - ai-learning-network
+    command: npm run seed:dev
+    profiles:
+      - seed
+
+  # Test runner service
+  test-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    environment:
+      - NODE_ENV=test
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/ai_learning_assistant_test
+    volumes:
+      - .:/app
+      - /app/node_modules
+    networks:
+      - ai-learning-network
+    command: npm run test:watch
+    profiles:
+      - test
+
+  # API documentation service
+  api-docs:
+    image: swaggerapi/swagger-ui:latest
+    ports:
+      - "8080:8080"
+    environment:
+      - SWAGGER_JSON=/docs/openapi.yml
+    volumes:
+      - ./docs:/docs
+    networks:
+      - ai-learning-network
+
+# ============================================================================
+# DEVELOPMENT VOLUMES (for faster rebuilds)
+# ============================================================================
+volumes:
+  node_modules_api_gateway:
+  node_modules_learning_svc:
+  node_modules_productivity_svc:
+  node_modules_knowledge_graph_svc:
+  node_modules_content_svc:
+  node_modules_analytics_svc:
+  node_modules_web:

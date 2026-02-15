@@ -1,0 +1,394 @@
+version: "3.8"
+
+services:
+  # ============================================================================
+  # API GATEWAY
+  # ============================================================================
+  api-gateway:
+    build:
+      context: ./services/api-gateway
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - LEARNING_SERVICE_URL=http://learning-service:3001
+      - PRODUCTIVITY_SERVICE_URL=http://productivity-service:3002
+      - KNOWLEDGE_GRAPH_SERVICE_URL=http://knowledge-graph-service:3003
+      - JWT_SECRET=your-jwt-secret-key
+      - CORS_ORIGIN=http://localhost:3000,http://localhost:3001
+    depends_on:
+      - learning-service
+      - productivity-service
+      - knowledge-graph-service
+      - redis
+    networks:
+      - ai-learning-network
+    volumes:
+      - ./services/api-gateway:/app
+      - /app/node_modules
+    command: npm run dev
+
+  # ============================================================================
+  # LEARNING SERVICE
+  # ============================================================================
+  learning-service:
+    build:
+      context: ./services/learning-svc
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=development
+      - PORT=3001
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/learning_db
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=your-jwt-secret-key
+      - JWT_REFRESH_SECRET=your-jwt-refresh-secret-key
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - ai-learning-network
+    volumes:
+      - ./services/learning-svc:/app
+      - /app/node_modules
+    command: npm run dev
+
+  # ============================================================================
+  # PRODUCTIVITY SERVICE
+  # ============================================================================
+  productivity-service:
+    build:
+      context: ./services/productivity-svc
+      dockerfile: Dockerfile
+    ports:
+      - "3002:3002"
+    environment:
+      - NODE_ENV=development
+      - PORT=3002
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/productivity_db
+      - REDIS_URL=redis://redis:6379
+      - MAX_CODEBASE_SIZE=100MB
+      - ANALYSIS_TIMEOUT=30000
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - ai-learning-network
+    volumes:
+      - ./services/productivity-svc:/app
+      - /app/node_modules
+    command: npm run dev
+
+  # ============================================================================
+  # KNOWLEDGE GRAPH SERVICE
+  # ============================================================================
+  knowledge-graph-service:
+    build:
+      context: ./services/knowledge-graph-svc
+      dockerfile: Dockerfile
+    ports:
+      - "3003:3003"
+    environment:
+      - NODE_ENV=development
+      - PORT=3003
+      - NEO4J_URI=bolt://neo4j:7687
+      - NEO4J_USER=neo4j
+      - NEO4J_PASSWORD=password
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - neo4j
+      - redis
+    networks:
+      - ai-learning-network
+    volumes:
+      - ./services/knowledge-graph-svc:/app
+      - /app/node_modules
+    command: npm run dev
+
+  # ============================================================================
+  # CONTENT SERVICE
+  # ============================================================================
+  content-service:
+    build:
+      context: ./services/content-svc
+      dockerfile: Dockerfile
+    ports:
+      - "3004:3004"
+    environment:
+      - NODE_ENV=development
+      - PORT=3004
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/content_db
+      - REDIS_URL=redis://redis:6379
+      - AWS_S3_BUCKET=ai-learning-content
+      - AWS_REGION=us-east-1
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - ai-learning-network
+    volumes:
+      - ./services/content-svc:/app
+      - /app/node_modules
+    command: npm run dev
+
+  # ============================================================================
+  # ANALYTICS SERVICE
+  # ============================================================================
+  analytics-service:
+    build:
+      context: ./services/analytics-svc
+      dockerfile: Dockerfile
+    ports:
+      - "3005:3005"
+    environment:
+      - NODE_ENV=development
+      - PORT=3005
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/analytics_db
+      - REDIS_URL=redis://redis:6379
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+    depends_on:
+      - postgres
+      - redis
+      - elasticsearch
+    networks:
+      - ai-learning-network
+    volumes:
+      - ./services/analytics-svc:/app
+      - /app/node_modules
+    command: npm run dev
+
+  # ============================================================================
+  # WEB FRONTEND
+  # ============================================================================
+  web-frontend:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    ports:
+      - "3100:3100"
+    environment:
+      - NODE_ENV=development
+      - PORT=3100
+      - REACT_APP_API_URL=http://localhost:3000
+      - REACT_APP_WS_URL=ws://localhost:3000
+    depends_on:
+      - api-gateway
+    networks:
+      - ai-learning-network
+    volumes:
+      - ./web:/app
+      - /app/node_modules
+    command: npm start
+
+  # ============================================================================
+  # DATABASES
+  # ============================================================================
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=ai_learning_assistant
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql
+    networks:
+      - ai-learning-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  neo4j:
+    image: neo4j:5.13-community
+    environment:
+      - NEO4J_AUTH=neo4j/password
+      - NEO4J_PLUGINS=["apoc"]
+      - NEO4J_dbms_security_procedures_unrestricted=apoc.*
+      - NEO4J_dbms_memory_heap_initial__size=512m
+      - NEO4J_dbms_memory_heap_max__size=2G
+    ports:
+      - "7474:7474" # HTTP
+      - "7687:7687" # Bolt
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+      - neo4j_import:/var/lib/neo4j/import
+      - neo4j_plugins:/plugins
+    networks:
+      - ai-learning-network
+    healthcheck:
+      test: ["CMD", "cypher-shell", "-u", "neo4j", "-p", "password", "RETURN 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================================================
+  # CACHE AND MESSAGE QUEUE
+  # ============================================================================
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - ai-learning-network
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================================================
+  # SEARCH AND ANALYTICS
+  # ============================================================================
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - ai-learning-network
+    healthcheck:
+      test:
+        ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.0
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - xpack.security.enabled=false
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+    networks:
+      - ai-learning-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5601/api/status || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # ============================================================================
+  # MONITORING AND OBSERVABILITY
+  # ============================================================================
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    networks:
+      - ai-learning-network
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.console.libraries=/etc/prometheus/console_libraries"
+      - "--web.console.templates=/etc/prometheus/consoles"
+      - "--web.enable-lifecycle"
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3200:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+    depends_on:
+      - prometheus
+    networks:
+      - ai-learning-network
+
+  # ============================================================================
+  # MESSAGE QUEUE (Optional - for advanced features)
+  # ============================================================================
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    environment:
+      - RABBITMQ_DEFAULT_USER=admin
+      - RABBITMQ_DEFAULT_PASS=password
+    ports:
+      - "5672:5672" # AMQP port
+      - "15672:15672" # Management UI
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - ai-learning-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # ============================================================================
+  # DEVELOPMENT TOOLS
+  # ============================================================================
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@example.com
+      - PGADMIN_DEFAULT_PASSWORD=admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    networks:
+      - ai-learning-network
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    networks:
+      - ai-learning-network
+
+# ============================================================================
+# NETWORKS
+# ============================================================================
+networks:
+  ai-learning-network:
+    driver: bridge
+
+# ============================================================================
+# VOLUMES
+# ============================================================================
+volumes:
+  postgres_data:
+  neo4j_data:
+  neo4j_logs:
+  neo4j_import:
+  neo4j_plugins:
+  redis_data:
+  elasticsearch_data:
+  prometheus_data:
+  grafana_data:
+  rabbitmq_data:
+  pgadmin_data:
