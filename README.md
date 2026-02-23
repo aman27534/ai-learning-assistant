@@ -1,5 +1,7 @@
 # AI Learning Assistant (Completed)
 
+[![CI/CD Pipeline](https://github.com/aman27534/ai-learning-assistant/actions/workflows/ci.yml/badge.svg)](https://github.com/aman27534/ai-learning-assistant/actions/workflows/ci.yml)
+
 An intelligent, adaptive learning platform that combines personalized tutoring, developer productivity tools, and intelligent knowledge organization to help people learn faster, work smarter, and become more productive with technology.
 
 ## 🚀 Features
@@ -111,6 +113,7 @@ The system follows a microservices architecture with the following components:
    ```
 
    **Windows Users:**
+
    ```bat
    start-dev.bat
    ```
