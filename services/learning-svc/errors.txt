@@ -1,0 +1,1 @@
+src/db.ts(3,7): error TS4023: Exported variable 'db' has or is using name 'BetterSqlite3.Database' from external module "C:/Users/next/OneDrive/Documents/project/node_modules/@types/better-sqlite3/index" but cannot be named.

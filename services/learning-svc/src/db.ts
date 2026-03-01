@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
 
-const db = new Database(process.env.NODE_ENV === 'test' ? ':memory:' : 'learning.db');
+const db: Database.Database = new Database(process.env.NODE_ENV === 'test' ? ':memory:' : 'learning.db');
 
 export const initDb = () => {
   // Users table
