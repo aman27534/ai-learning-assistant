@@ -1,12 +1,13 @@
 // Test setup file
 // This file runs before each test suite
 
-import { initDb } from '../db';
-
 // Set test environment variables BEFORE any imports
 process.env.NODE_ENV = 'test';
 process.env.JWT_SECRET = 'test-jwt-secret';
 process.env.JWT_REFRESH_SECRET = 'test-jwt-refresh-secret';
+
+// Now import db after setting NODE_ENV
+const { initDb } = require('../db');
 
 // Initialize database before tests
 initDb();
