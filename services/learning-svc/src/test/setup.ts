@@ -7,6 +7,7 @@ process.env.JWT_SECRET = 'test-jwt-secret';
 process.env.JWT_REFRESH_SECRET = 'test-jwt-refresh-secret';
 
 // Now import db after setting NODE_ENV
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const { initDb } = require('../db');
 
 // Initialize database before tests

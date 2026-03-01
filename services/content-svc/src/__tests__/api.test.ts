@@ -1,8 +1,13 @@
-
 import request from 'supertest';
 import app from '../index';
 
+import { initDb } from '../db';
+
 describe('Content Service Endpoints', () => {
+    beforeAll(() => {
+        process.env.NODE_ENV = 'test';
+        initDb();
+    });
     it('should return health status', async () => {
         const res = await request(app).get('/health');
         expect(res.statusCode).toEqual(200);
